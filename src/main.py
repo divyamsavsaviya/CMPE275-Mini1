@@ -1,47 +1,40 @@
-from src.csv_reader import CSVReaderFacade
+# src/main.py
 import time
 import psutil
 from memory_profiler import memory_usage
+from src.api.data_api import DataAPI
 
-def measure_performance():
-    # Start measuring time
-    start_time = time.perf_counter()
+def measure_performance(func):
+    def wrapper(*args, **kwargs):
+        start_time = time.perf_counter()
+        process = psutil.Process()
+        start_cpu_times = process.cpu_times()
+        mem_usage_before = memory_usage(-1, interval=0.1, timeout=1)
 
-    # Start measuring CPU usage
-    process = psutil.Process()
-    start_cpu_times = process.cpu_times()
+        result = func(*args, **kwargs)
 
-    # Start measuring memory usage
-    mem_usage_before = memory_usage(-1, interval=0.1, timeout=1)
+        mem_usage_after = memory_usage(-1, interval=0.1, timeout=1)
+        end_cpu_times = process.cpu_times()
+        end_time = time.perf_counter()
 
-    # Read CSV data
-    csv_reader = CSVReaderFacade('data/data_1.csv')
-    data = csv_reader.read_csv()
+        elapsed_time = round(end_time - start_time, 5)
+        cpu_time_user = round(end_cpu_times.user - start_cpu_times.user, 5)
+        cpu_time_system = round(end_cpu_times.system - start_cpu_times.system, 5)
+        mem_usage = round(mem_usage_after[0] - mem_usage_before[0], 5)
 
-    # End measuring memory usage
-    mem_usage_after = memory_usage(-1, interval=0.1, timeout=1)
+        print(f'Finished in {elapsed_time} second(s)')
+        print(f'User CPU time: {cpu_time_user} second(s)')
+        print(f'System CPU time: {cpu_time_system} second(s)')
+        print(f'Memory usage: {mem_usage} MiB')
 
-    # End measuring CPU usage
-    end_cpu_times = process.cpu_times()
+        return result
+    return wrapper
 
-    # End measuring time
-    end_time = time.perf_counter()
-
-    # Calculate metrics
-    elapsed_time = round(end_time - start_time, 5)
-    cpu_time_user = round(end_cpu_times.user - start_cpu_times.user, 5)
-    cpu_time_system = round(end_cpu_times.system - start_cpu_times.system, 5)
-    mem_usage = round(mem_usage_after[0] - mem_usage_before[0], 5)
-
-    # Print the first few rows to verify the data
-    for i, row in enumerate(data[:5]):  # Adjust the range as needed
-        print(f"Row {i}: {row}\n")
-
-    # Print performance metrics
-    print(f'Finished in {elapsed_time} second(s)')
-    print(f'User CPU time: {cpu_time_user} second(s)')
-    print(f'System CPU time: {cpu_time_system} second(s)')
-    print(f'Memory usage: {mem_usage} MiB')
+@measure_performance
+def main():
+    api = DataAPI('data/data_1.csv')
+    all_data = api.get_all_data()
+    print(all_data[0])
 
 if __name__ == "__main__":
-    measure_performance()
+    main()
