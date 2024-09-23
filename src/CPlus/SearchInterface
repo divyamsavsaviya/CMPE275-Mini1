@@ -1,0 +1,82 @@
+// #include <iostream>
+// #include <vector>
+// #include <algorithm>
+
+// // Abstract Search Interface (Facade Pattern)
+// class SearchInterface {
+// public:
+//     virtual void extractData() = 0;
+//     virtual std::vector<int> exactSearch(int value) = 0;
+//     virtual std::vector<int> rangeSearch(int low, int high) = 0;
+//     virtual ~SearchInterface() = default;
+// };
+
+// // Data Storage Class
+// class DataStorage : public SearchInterface {
+// private:
+//     std::vector<int> data;
+
+// public:
+//     DataStorage(const std::vector<int>& inputData) : data(inputData) {}
+
+//     // Extract Data (For testing or additional features)
+//     void extractData() override {
+//         std::cout << "Extracting Data: ";
+//         for (int val : data) {
+//             std::cout << val << " ";
+//         }
+//         std::cout << std::endl;
+//     }
+
+//     // Exact Search: Find values exactly matching the input
+//     std::vector<int> exactSearch(int value) override {
+//         std::vector<int> result;
+//         for (const auto& val : data) {
+//             if (val == value) {
+//                 result.push_back(val);
+//             }
+//         }
+//         return result;
+//     }
+
+//     // Range Search: Find values within the range [low, high]
+//     std::vector<int> rangeSearch(int low, int high) override {
+//         std::vector<int> result;
+//         for (const auto& val : data) {
+//             if (val >= low && val <= high) {
+//                 result.push_back(val);
+//             }
+//         }
+//         return result;
+//     }
+// };
+
+// // Test Harness
+// void testSearch() {
+//     std::vector<int> testData = {1, 5, 3, 9, 7, 12, 4, 6};
+//     DataStorage dataStore(testData);
+
+//     // Extract Data
+//     dataStore.extractData();
+
+//     // Perform Exact Search
+//     std::vector<int> exactResult = dataStore.exactSearch(5);
+//     std::cout << "Exact Search Result for 5: ";
+//     for (int val : exactResult) {
+//         std::cout << val << " ";
+//     }
+//     std::cout << std::endl;
+
+//     // Perform Range Search
+//     std::vector<int> rangeResult = dataStore.rangeSearch(4, 10);
+//     std::cout << "Range Search Result for [4, 10]: ";
+//     for (int val : rangeResult) {
+//         std::cout << val << " ";
+//     }
+//     std::cout << std::endl;
+// }
+
+// int main() {
+//     testSearch();
+//     return 0;
+// }
