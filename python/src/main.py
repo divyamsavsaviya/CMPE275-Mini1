@@ -1,4 +1,7 @@
-# src/main.py
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 import time
 import psutil
 from memory_profiler import memory_usage
@@ -34,7 +37,7 @@ def measure_performance(func):
 def main():
     api = DataAPI('data/data_1.csv')
     all_data = api.get_all_data()
-    print(all_data[0])
+    print(all_data[1])
 
 if __name__ == "__main__":
     main()
