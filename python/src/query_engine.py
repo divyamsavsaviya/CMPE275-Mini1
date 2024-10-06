@@ -66,14 +66,20 @@ class QueryEngine:
         
         if order_by:
             reverse = order_by.endswith('DESC')
-            order_col = order_by.split()[0].strip('"')
-            result.sort(key=lambda x: self.sort_key(x.get(order_col, '')), reverse=reverse)
+            order_col = order_by.split()[0]
+            result.sort(key=lambda x: self.safe_numeric_convert(x[order_col]), reverse=reverse)
         
         if limit:
             result = result[:int(limit)]
         
         print(f"Query result count: {len(result)}")
         return result
+
+    def safe_numeric_convert(self, value):
+        try:
+            return float(value)
+        except ValueError:
+            return value
 
     def sort_key(self, value):
         if isinstance(value, (int, float)):
