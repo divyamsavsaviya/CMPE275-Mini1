@@ -9,17 +9,26 @@ std::vector<std::unordered_map<std::string, std::string>> CSVReader::readCSV() {
     std::vector<std::unordered_map<std::string, std::string>> data;
     std::ifstream file(filename);
     std::string line;
+    std::vector<std::string> headers;
 
-    // Read header
-    std::getline(file, line);
-    std::vector<std::string> headers = splitLine(line);
+    if (std::getline(file, line)) {
+        std::istringstream iss(line);
+        std::string header;
+        while (std::getline(iss, header, ',')) {
+            headers.push_back(header);
+        }
+    }
 
-    // Read data
     while (std::getline(file, line)) {
-        std::vector<std::string> values = splitLine(line);
         std::unordered_map<std::string, std::string> row;
-        for (size_t i = 0; i < headers.size() && i < values.size(); ++i) {
-            row[headers[i]] = values[i];
+        std::istringstream iss(line);
+        std::string value;
+        size_t i = 0;
+        while (std::getline(iss, value, ',')) {
+            if (i < headers.size()) {
+                row[headers[i]] = value;
+            }
+            ++i;
         }
         data.push_back(row);
     }

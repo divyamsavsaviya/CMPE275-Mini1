@@ -2,25 +2,78 @@
 #include <iostream>
 #include <sstream>
 #include <regex>
+#include <chrono>
+#include <iomanip>
+#include "PerformanceMeasurement.h"
 
 CLI::CLI(QueryEngine& qe) : queryEngine(qe) {}
 
 void CLI::run() {
-    while (true) {
-        std::cout << "\nEnter your query (or 'exit' to quit):" << std::endl;
-        std::string query;
-        std::getline(std::cin, query);
+    std::string query;
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-        if (query == "exit") break;
+    if (rank == 0) {
+        while (true) {
+            std::cout << "\nEnter your query (or 'exit' to quit):\n";
+            std::cout << "Format: SELECT column1,column2,... WHERE condition1 AND condition2 ... ORDER BY column [ASC|DESC] LIMIT n\n> ";
+            std::getline(std::cin, query);
 
-        try {
+            if (query == "exit") {
+                break;
+            }
+
+            auto start_time = std::chrono::high_resolution_clock::now();
+
             auto [selectColumns, conditions, orderBy, limit] = parseQuery(query);
-            auto results = queryEngine.executeQuery(selectColumns, conditions, orderBy, limit);
-            displayResults(results);
-        } catch (const std::exception& e) {
-            std::cerr << "An error occurred: " << e.what() << std::endl;
+            
+            auto [results, perf] = queryEngine.executeQueryWithPerformance(selectColumns, conditions, orderBy, limit);
+
+            auto end_time = std::chrono::high_resolution_clock::now();
+            auto total_duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time).count() / 1e6;
+
+            displayFormattedResults(results, selectColumns);
+            displayPerformanceMetrics(perf, results.size(), total_duration);
         }
     }
+}
+
+void CLI::displayFormattedResults(const std::vector<std::unordered_map<std::string, std::string>>& results, const std::vector<std::string>& selectColumns) {
+    if (results.empty() || selectColumns.empty()) {
+        std::cout << "No results found." << std::endl;
+        return;
+    }
+
+    // Print header
+    std::cout << "Row | ";
+    for (const auto& col : selectColumns) {
+        std::cout << "\"" << col << "\" | ";
+    }
+    std::cout << "\n" << std::string(80, '-') << std::endl;
+
+    // Print rows
+    for (size_t i = 0; i < results.size(); ++i) {
+        std::cout << i + 1 << " | ";
+        for (const auto& col : selectColumns) {
+            auto it = results[i].find(col);
+            if (it != results[i].end()) {
+                std::cout << it->second << " | ";
+            } else {
+                std::cout << "N/A | ";
+            }
+        }
+        std::cout << std::endl;
+    }
+}
+
+void CLI::displayPerformanceMetrics(const PerformanceMeasurement& perf, size_t resultCount, double totalTime) {
+    std::cout << "\nQuery Performance Metrics:" << std::endl;
+    std::cout << "Execution Time: " << std::fixed << std::setprecision(4) << perf.getExecutionTime() << " seconds" << std::endl;
+    std::cout << "CPU Time: " << std::fixed << std::setprecision(4) << perf.getCPUTime() << " seconds" << std::endl;
+    std::cout << "Memory Usage: " << std::fixed << std::setprecision(2) << perf.getMemoryUsage() / (1024.0 * 1024.0) << " MB" << std::endl;
+    std::cout << "Query result count: " << resultCount << std::endl;
+    std::cout << "\nTotal results: " << resultCount << std::endl;
+    std::cout << "Total query processing time: " << std::fixed << std::setprecision(4) << totalTime << " seconds" << std::endl;
 }
 
 std::tuple<std::vector<std::string>, std::vector<std::pair<std::string, std::string>>, std::string, int> CLI::parseQuery(const std::string& query) {
@@ -40,7 +93,7 @@ std::tuple<std::vector<std::string>, std::vector<std::pair<std::string, std::str
         std::istringstream iss(match[1]);
         std::string column;
         while (std::getline(iss, column, ',')) {
-            selectColumns.push_back(trim(column));
+            selectColumns.push_back(this->trim(column));
         }
     }
 
@@ -52,15 +105,15 @@ std::tuple<std::vector<std::string>, std::vector<std::pair<std::string, std::str
 
         for (std::sregex_iterator i = words_begin; i != words_end; ++i) {
             std::smatch match = *i;
-            std::string column = removeQuotes(trim(match[1]));
+            std::string column = this->removeQuotes(this->trim(match[1]));
             std::string op = match[2];
-            std::string value = removeQuotes(trim(match[3]));
+            std::string value = this->removeQuotes(this->trim(match[3]));
             conditions.emplace_back(column, value);
         }
     }
 
     if (std::regex_search(query, match, orderByPattern)) {
-        orderBy = trim(match[1]);
+        orderBy = this->trim(match[1]);
     }
 
     if (std::regex_search(query, match, limitPattern)) {
@@ -83,47 +136,21 @@ std::tuple<std::vector<std::string>, std::vector<std::pair<std::string, std::str
 }
 
 std::string CLI::removeQuotes(const std::string& str) {
-    if (str.size() >= 2 && str.front() == '"' && str.back() == '"') {
-        return str.substr(1, str.size() - 2);
-    }
-    return str;
+    std::string result = str;
+    result.erase(std::remove(result.begin(), result.end(), '\"'), result.end());
+    return result;
 }
 
-void CLI::displayResults(const std::vector<std::unordered_map<std::string, std::string>>& results) {
-    if (results.empty()) {
-        std::cout << "No results found." << std::endl;
-        return;
-    }
-
-    // Print header
-    for (const auto& [key, value] : results[0]) {
-        std::cout << key << " | ";
-    }
-    std::cout << std::endl;
-
-    // Print separator
-    for (size_t i = 0; i < results[0].size(); ++i) {
-        std::cout << "----------------";
-    }
-    std::cout << std::endl;
-
-    // Print rows
-    for (const auto& row : results) {
-        for (const auto& [key, value] : row) {
-            std::cout << value << " | ";
-        }
-        std::cout << std::endl;
-    }
-
-    std::cout << "\nTotal results: " << results.size() << std::endl;
-}
-
-// Helper function to trim whitespace from a string
 std::string CLI::trim(const std::string& str) {
-    size_t first = str.find_first_not_of(' ');
-    if (std::string::npos == first) {
-        return str;
+    auto start = str.begin();
+    while (start != str.end() && std::isspace(*start)) {
+        start++;
     }
-    size_t last = str.find_last_not_of(' ');
-    return str.substr(first, (last - first + 1));
+
+    auto end = str.end();
+    do {
+        end--;
+    } while (std::distance(start, end) > 0 && std::isspace(*end));
+
+    return std::string(start, end + 1);
 }

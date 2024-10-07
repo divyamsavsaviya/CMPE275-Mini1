@@ -1,39 +1,46 @@
-CC = g++
-CFLAGS = -std=c++17 -Wall -I./cPlusPlus/src
-SRCDIR = cPlusPlus/src
-OBJDIR = obj
+CXX = mpic++
+CXXFLAGS = -std=c++17 -Wall -Wextra -g
+LDFLAGS = -lmpi
 
-SOURCES = $(wildcard $(SRCDIR)/*.cpp $(SRCDIR)/api/*.cpp $(SRCDIR)/data/*.cpp)
-OBJECTS = $(SOURCES:$(SRCDIR)/%.cpp=$(OBJDIR)/%.o)
-EXECUTABLE = myprogram
+# Update these paths to match your OpenMPI installation 
+OPENMPI_INCLUDE = -I/usr/lib/x86_64-linux-gnu/openmpi/include
+OPENMPI_LIB = -L/usr/lib/x86_64-linux-gnu/openmpi/lib
 
-all: $(EXECUTABLE)
+# Uncomment and use these if you need to specify custom OpenMPI paths
+# INCLUDES = -I$(OPENMPI_INCLUDE)
+# LIBS = -L$(OPENMPI_LIB)
 
-$(EXECUTABLE): $(OBJECTS)
-	$(CC) $(CFLAGS) $^ -o $@
+SRC_DIR = cPlusPlus/src
+API_DIR = $(SRC_DIR)/api
+DATA_DIR = $(SRC_DIR)/data
+BUILD_DIR = cPlusPlus/build
 
-$(OBJDIR)/%.o: $(SRCDIR)/%.cpp
+INCLUDES = -I$(API_DIR) -I$(DATA_DIR)
+
+MAIN_SRC = $(SRC_DIR)/main.cpp
+SRCS = $(MAIN_SRC) $(wildcard $(SRC_DIR)/*.cpp) $(wildcard $(API_DIR)/*.cpp) $(wildcard $(DATA_DIR)/*.cpp)
+DEPS = $(OBJS:.o=.d)
+
+OBJS = $(SRCS:%.cpp=$(BUILD_DIR)/%.o)
+
+EXEC = $(BUILD_DIR)/query_engine
+
+.PHONY: all clean run
+
+all: $(EXEC)
+
+$(EXEC): $(OBJS)
 	@mkdir -p $(@D)
-	$(CC) $(CFLAGS) -c $< -o $@
+	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS)
 
-# Add explicit rules for each object file
-$(OBJDIR)/main.o: $(SRCDIR)/main.cpp
-	@mkdir -p $(OBJDIR)
-	$(CC) $(CFLAGS) -c $< -o $@
-
-$(OBJDIR)/api/QueryEngine.o: $(SRCDIR)/api/QueryEngine.cpp
-	@mkdir -p $(OBJDIR)/api
-	$(CC) $(CFLAGS) -c $< -o $@
-
-$(OBJDIR)/api/CLI.o: $(SRCDIR)/api/CLI.cpp
-	@mkdir -p $(OBJDIR)/api
-	$(CC) $(CFLAGS) -c $< -o $@
-
-$(OBJDIR)/data/CSVReader.o: $(SRCDIR)/data/CSVReader.cpp
-	@mkdir -p $(OBJDIR)/data
-	$(CC) $(CFLAGS) -c $< -o $@
+$(BUILD_DIR)/%.o: %.cpp
+	@mkdir -p $(@D)
+	$(CXX) $(CXXFLAGS) $(INCLUDES) -MMD -MP -c $< -o $@
 
 clean:
-	rm -rf $(OBJDIR) $(EXECUTABLE)
+	rm -rf $(BUILD_DIR)
 
-.PHONY: all clean
+run: $(EXEC)
+	mpirun -np 8 ./$(EXEC) path/to/your/csv/file.csv
+
+-include $(DEPS)

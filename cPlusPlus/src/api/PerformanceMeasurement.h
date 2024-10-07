@@ -3,12 +3,15 @@
 
 class PerformanceMeasurement {
 public:
-    static void start();
-    static void stop();
-    static double getCPUTime();
-    static long long getMemoryUsage();
+    void start();
+    void stop();
+    double getExecutionTime() const;
+    double getCPUTime() const;
+    size_t getMemoryUsage() const;
 
 private:
-    static std::chrono::high_resolution_clock::time_point startTime;
-    static std::chrono::high_resolution_clock::time_point endTime;
+    std::chrono::high_resolution_clock::time_point startTime;
+    std::chrono::high_resolution_clock::time_point endTime;
+    double cpuTime;
+    size_t memoryUsage;
 };

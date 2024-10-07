@@ -1,21 +1,21 @@
 #include "CSVReaderFacade.h"
+#include "CSVReader.h"
 
-CSVReaderFacade::CSVReaderFacade(const std::string& filename) {
-    CSVReader reader(filename);
-    data = reader.readCSV();
-
-    for (auto& row : data) {
-        if (row.find("Country Code") != row.end()) {
-            indexedData[row["Country Code"]] = &row;
-        }
-    }
-}
+CSVReaderFacade::CSVReaderFacade(const std::string& filename) : filename(filename) {}
 
 std::vector<std::unordered_map<std::string, std::string>> CSVReaderFacade::getAllData() {
-    return data;
+    CSVReader reader(filename);
+    return reader.readCSV();
 }
 
-std::unordered_map<std::string, std::string>* CSVReaderFacade::getByCountryCode(const std::string& countryCode) {
-    auto it = indexedData.find(countryCode);
-    return it != indexedData.end() ? it->second : nullptr;
+std::unordered_map<std::string, std::string> CSVReaderFacade::getByCountryCode(const std::string& countryCode) {
+    CSVReader reader(filename);
+    auto allData = reader.readCSV();
+    for (const auto& row : allData) {
+        auto it = row.find("Country Code");
+        if (it != row.end() && it->second == countryCode) {
+            return row;
+        }
+    }
+    return {};  
 }
