@@ -1,11 +1,20 @@
-#include "api/DataApi.h"
+#include "api/DataApi.cpp"
 #include "api/PerformanceMeasurement.h"
+#include <iostream>
+#include <fstream>
 
 int main() {
-    // Start performance measurement
     PerformanceMeasurement::start();
 
-    DataApi api("../../../data/data_1.csv");
+    std::string filename = "/mnt/c/Users/tript/IdeaProjects/CMPE275-Mini1/data/data_1.csv";
+    std::ifstream file(filename);
+    if (!file.is_open()) {
+        std::cerr << "Error: File does not exist or could not be opened: " << filename << std::endl;
+        return 1;
+    }
+    file.close();
+
+    DataApi api(filename);
     auto allData = api.getAllData();
 
     // Print the first row for testing purposes
@@ -13,11 +22,10 @@ int main() {
         allData[0].print();
     }
 
-    // Performance measurement after operation
+    PerformanceMeasurement::end();
     PerformanceMeasurement::getMemoryUsage();
     PerformanceMeasurement::getCPUTime();
 
-    // End performance measurement
     PerformanceMeasurement::stop();
 
     return 0;
