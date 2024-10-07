@@ -11,39 +11,28 @@ private:
 
 public:
     CSVReader(const std::string& file) : filename(file) {
-//        std::cout << "Inside CSVReader constructor!" << std::endl;
 }
 
     std::vector<CSVRow> readCSV() {
-//        std::cout << "Inside CSVReader readCsv method!" << std::endl;
 
         std::vector<CSVRow> data;
-//        std::cout << "Inside CSVReader BP1" << std::endl;
-
         std::ifstream fileStream(filename);
-//        std::cout << "Inside CSVReader BP2" << std::endl;
-
         std::string line, word;
-//        std::cout << "Inside CSVReader BP3" << line << word << std::endl;
 
-        // Skip the header line
         std::getline(fileStream, line);
-//        std::cout << "Inside CSVReader BP4" << std::endl;
-
-        // Read each line from CSV
         while (std::getline(fileStream, line)) {
-//            std::cout << "Inside CSVReader BP5" << std::endl;
-
-            std::stringstream ss(line);
             std::vector<std::string> row;
+            std::stringstream ss(line);
+            std::string cell;
 
-            while (std::getline(ss, word, ',')) {
-                row.push_back(word);
+            while (std::getline(ss, cell, ',')) {
+               if (cell.front() == '"' && cell.back() == '"') {
+                   cell = cell.substr(1, cell.length() - 2);
+               }
+               row.push_back(cell);
             }
 
-            // Assuming the order: Country_Name, Country_Code, Indicator_Name, Indicator_Code, Year_1960, Year_1961...
-            if (row.size() >= 6) {
-//                    std::cout << "inside csvreader printing! rowSize: " << row.size() << std::endl;
+            if (row.size() >= 68) {
 
                 CSVRow csvRow(row[0], row[1], row[2], row[3], row[4], row[5], row[6], row[7], row[8], row[9], row[10],
                 row[11], row[12], row[13], row[14], row[15], row[16], row[17], row[18], row[19], row[20], row[21],

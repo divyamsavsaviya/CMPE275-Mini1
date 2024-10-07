@@ -1,5 +1,6 @@
-#include "api/DataApi.cpp"
 #include "api/PerformanceMeasurement.h"
+#include "api/CLI.cpp"
+#include "api/QueryEngine.h"
 #include <iostream>
 #include <fstream>
 
@@ -14,13 +15,9 @@ int main() {
     }
     file.close();
 
-    DataApi api(filename);
-    auto allData = api.getAllData();
-
-    // Print the first row for testing purposes
-    if (!allData.empty()) {
-        allData[0].print();
-    }
+    QueryEngine queryEngine(filename);
+    CLI cli(queryEngine);
+    cli.run();
 
     PerformanceMeasurement::end();
     PerformanceMeasurement::getMemoryUsage();

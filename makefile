@@ -1,9 +1,9 @@
 # Compiler
 CXX = g++
-CXXFLAGS = -I./include -std=c++11
+CXXFLAGS = -I./include -std=c++17
 
 # Source files
-SRCS = src/CPlus/main.cpp src/CPlus/api/DataApi.cpp src/CPlus/api/PerformanceMeasurement.cpp src/CPlus/data/CSVReader.cpp src/CPlus/data/CSVReaderFacade.cpp src/CPlus/data/CSVRow.cpp
+SRCS = src/CPlus/main.cpp src/CPlus/api/DataApi.cpp src/CPlus/api/PerformanceMeasurement.cpp src/CPlus/data/CSVReader.cpp src/CPlus/data/CSVReaderFacade.cpp src/CPlus/data/CSVRow.cpp src/CPlus/api/CLI.cpp src/CPlus/api/QueryEngine.h
 
 # Object files
 OBJS = $(SRCS:.cpp=.o)
