@@ -1,37 +1,21 @@
-#pragma once
-#include "CSVReader.cpp"
-#include <unordered_map>
-#include <iostream>
-#include <fstream>
-#include <vector>
+#include "CSVReaderFacade.h"
 
-class CSVReaderFacade {
-private:
-    CSVReader reader;
-    std::vector<CSVRow> data;
-    std::unordered_map<std::string, CSVRow*> indexedData;
+CSVReaderFacade::CSVReaderFacade(const std::string& filename) {
+    CSVReader reader(filename);
+    data = reader.readCSV();
 
-public:
-    CSVReaderFacade(const std::string& filename) : reader(filename) {
-//        std::cout << "Inside CSVReaderFacade BP1: " << filename << std::endl;
-
-        data = reader.readCSV();
-//        std::cout << "Inside CSVReaderFacade BP2: " << data.size() << std::endl;
-
-        for (auto& row : data) {
-            indexedData[row.Country_Code] = &row;
+    for (auto& row : data) {
+        if (row.find("Country Code") != row.end()) {
+            indexedData[row["Country Code"]] = &row;
         }
     }
+}
 
-    std::vector<CSVRow> getAllData() {
-        return data;
-    }
+std::vector<std::unordered_map<std::string, std::string>> CSVReaderFacade::getAllData() {
+    return data;
+}
 
-    CSVRow* getByCountryCode(const std::string& countryCode) {
-        auto it = indexedData.find(countryCode);
-        if (it != indexedData.end()) {
-            return it->second;
-        }
-        return nullptr;
-    }
-};
+std::unordered_map<std::string, std::string>* CSVReaderFacade::getByCountryCode(const std::string& countryCode) {
+    auto it = indexedData.find(countryCode);
+    return it != indexedData.end() ? it->second : nullptr;
+}

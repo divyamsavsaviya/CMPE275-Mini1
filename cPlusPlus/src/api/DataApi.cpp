@@ -1,22 +1,11 @@
-#pragma once
-#include "../data/CSVReaderFacade.cpp"
-#include <iostream>
+#include "DataApi.h"
 
-class DataApi {
-private:
-    CSVReaderFacade facade;
+DataApi::DataApi(const std::string& filename) : csvReaderFacade(filename) {}
 
-public:
-    DataApi(const std::string& filename) : facade(filename) {
-//        std::cout << "Inside DataApi BP1" << filename << std::endl;
+std::vector<std::unordered_map<std::string, std::string>> DataApi::getAllData() {
+    return csvReaderFacade.getAllData();
 }
 
-    std::vector<CSVRow> getAllData() {
-//        std::cout << "Inside DataApi BP2" << std::endl;
-        return facade.getAllData();
-    }
-
-    CSVRow* getByCountryCode(const std::string& countryCode) {
-        return facade.getByCountryCode(countryCode);
-    }
-};
+std::unordered_map<std::string, std::string>* DataApi::getByCountryCode(const std::string& countryCode) {
+    return csvReaderFacade.getByCountryCode(countryCode);
+}

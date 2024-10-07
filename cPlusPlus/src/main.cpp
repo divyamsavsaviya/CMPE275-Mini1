@@ -1,29 +1,31 @@
 #include "api/PerformanceMeasurement.h"
-#include "api/CLI.cpp"
 #include "api/QueryEngine.h"
+#include "api/CLI.h"
 #include <iostream>
-#include <fstream>
 
 int main() {
-    PerformanceMeasurement::start();
+    try {
+        PerformanceMeasurement::start();
+        long long initialMemory = PerformanceMeasurement::getMemoryUsage();
+        std::string filename = "/mnt/c/Users/tript/IdeaProjects/CMPE275-Mini1/data/data_1.csv";
+        QueryEngine queryEngine(filename);
+        CLI cli(queryEngine);
 
-    std::string filename = "/mnt/c/Users/tript/IdeaProjects/CMPE275-Mini1/data/data_1.csv";
-    std::ifstream file(filename);
-    if (!file.is_open()) {
-        std::cerr << "Error: File does not exist or could not be opened: " << filename << std::endl;
+
+        cli.run();
+
+        PerformanceMeasurement::stop();
+        long long finalMemory = PerformanceMeasurement::getMemoryUsage();
+
+        double cpuTime = PerformanceMeasurement::getCPUTime();
+        long long memoryUsed = finalMemory - initialMemory;
+
+        std::cout << "CPU Time: " << cpuTime << " seconds" << std::endl;
+        std::cout << "Memory Used: " << memoryUsed << " bytes" << std::endl;
+
+    } catch (const std::exception& e) {
+        std::cerr << "An error occurred: " << e.what() << std::endl;
         return 1;
     }
-    file.close();
-
-    QueryEngine queryEngine(filename);
-    CLI cli(queryEngine);
-    cli.run();
-
-    PerformanceMeasurement::end();
-    PerformanceMeasurement::getMemoryUsage();
-    PerformanceMeasurement::getCPUTime();
-
-    PerformanceMeasurement::stop();
-
     return 0;
 }

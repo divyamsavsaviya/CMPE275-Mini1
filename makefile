@@ -1,29 +1,39 @@
-# Compiler
-CXX = g++
-CXXFLAGS = -I./include -std=c++17
+CC = g++
+CFLAGS = -std=c++17 -Wall -I./cPlusPlus/src
+SRCDIR = cPlusPlus/src
+OBJDIR = obj
 
-# Source files
-SRCS = src/CPlus/main.cpp src/CPlus/api/DataApi.cpp src/CPlus/api/PerformanceMeasurement.cpp src/CPlus/data/CSVReader.cpp src/CPlus/data/CSVReaderFacade.cpp src/CPlus/data/CSVRow.cpp src/CPlus/api/CLI.cpp src/CPlus/api/QueryEngine.h
+SOURCES = $(wildcard $(SRCDIR)/*.cpp $(SRCDIR)/api/*.cpp $(SRCDIR)/data/*.cpp)
+OBJECTS = $(SOURCES:$(SRCDIR)/%.cpp=$(OBJDIR)/%.o)
+EXECUTABLE = myprogram
 
-# Object files
-OBJS = $(SRCS:.cpp=.o)
+all: $(EXECUTABLE)
 
-# Output executable
-TARGET = myprogram
+$(EXECUTABLE): $(OBJECTS)
+	$(CC) $(CFLAGS) $^ -o $@
 
-# Default target
-all: $(TARGET)
+$(OBJDIR)/%.o: $(SRCDIR)/%.cpp
+	@mkdir -p $(@D)
+	$(CC) $(CFLAGS) -c $< -o $@
 
-# Build the executable
-$(TARGET): $(OBJS)
-	$(CXX) $(OBJS) -o $(TARGET)
+# Add explicit rules for each object file
+$(OBJDIR)/main.o: $(SRCDIR)/main.cpp
+	@mkdir -p $(OBJDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
 
-# Compile .cpp files to .o files
-%.o: %.cpp
-	$(CXX) $(CXXFLAGS) -c $< -o $@
+$(OBJDIR)/api/QueryEngine.o: $(SRCDIR)/api/QueryEngine.cpp
+	@mkdir -p $(OBJDIR)/api
+	$(CC) $(CFLAGS) -c $< -o $@
 
-# Clean build files
+$(OBJDIR)/api/CLI.o: $(SRCDIR)/api/CLI.cpp
+	@mkdir -p $(OBJDIR)/api
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(OBJDIR)/data/CSVReader.o: $(SRCDIR)/data/CSVReader.cpp
+	@mkdir -p $(OBJDIR)/data
+	$(CC) $(CFLAGS) -c $< -o $@
+
 clean:
-	rm -f $(OBJS) $(TARGET)
+	rm -rf $(OBJDIR) $(EXECUTABLE)
 
 .PHONY: all clean
