@@ -37,7 +37,8 @@ std::vector<std::unordered_map<std::string, std::string>> QueryEngine::executeQu
     for (const auto& row : data) {
         bool satisfiesConditions = true;
         for (const auto& [column, value] : conditions) {
-            auto it = row.find('"' + column + '"');
+            std::string quotedColumn = '"' + column + '"';
+            auto it = row.find(quotedColumn);
             if (it == row.end()) {
                 std::cout << "Condition column '" << column << "' not found in row." << std::endl;
                 satisfiesConditions = false;
@@ -52,9 +53,10 @@ std::vector<std::unordered_map<std::string, std::string>> QueryEngine::executeQu
         if (satisfiesConditions) {
             std::unordered_map<std::string, std::string> resultRow;
             for (const auto& col : selectColumns) {
-                auto it = row.find('"' + col + '"');
+                std::string quotedCol = '"' + removeQuotes(col) + '"';
+                auto it = row.find(quotedCol);
                 if (it != row.end()) {
-                    resultRow[col] = removeQuotes(it->second);
+                    resultRow[removeQuotes(col)] = removeQuotes(it->second);
                 } else {
                     std::cout << "Selected column '" << col << "' not found in row." << std::endl;
                 }

@@ -46,14 +46,15 @@ std::tuple<std::vector<std::string>, std::vector<std::pair<std::string, std::str
 
     if (std::regex_search(query, match, wherePattern)) {
         std::string whereClause = match[1];
-        std::regex conditionPattern(R"(("?[\w\s]+"?)\s*=\s*("?[\w\s]+"?))");
+        std::regex conditionPattern(R"(("?[\w\s]+"?)\s*(=|>|<)\s*("?[\w\s]+"?))");
         auto words_begin = std::sregex_iterator(whereClause.begin(), whereClause.end(), conditionPattern);
         auto words_end = std::sregex_iterator();
 
         for (std::sregex_iterator i = words_begin; i != words_end; ++i) {
             std::smatch match = *i;
             std::string column = removeQuotes(trim(match[1]));
-            std::string value = removeQuotes(trim(match[2]));
+            std::string op = match[2];
+            std::string value = removeQuotes(trim(match[3]));
             conditions.emplace_back(column, value);
         }
     }
@@ -95,14 +96,20 @@ void CLI::displayResults(const std::vector<std::unordered_map<std::string, std::
     }
 
     // Print header
-    for (const auto& [key, _] : results[0]) {
+    for (const auto& [key, value] : results[0]) {
         std::cout << key << " | ";
     }
-    std::cout << std::endl << std::string(80, '-') << std::endl;
+    std::cout << std::endl;
+
+    // Print separator
+    for (size_t i = 0; i < results[0].size(); ++i) {
+        std::cout << "----------------";
+    }
+    std::cout << std::endl;
 
     // Print rows
     for (const auto& row : results) {
-        for (const auto& [_, value] : row) {
+        for (const auto& [key, value] : row) {
             std::cout << value << " | ";
         }
         std::cout << std::endl;
