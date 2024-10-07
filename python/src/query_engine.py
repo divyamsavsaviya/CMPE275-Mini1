@@ -1,4 +1,6 @@
 import re
+import time
+import psutil
 
 class QueryEngine:
     def __init__(self, data, columns):
@@ -46,6 +48,10 @@ class QueryEngine:
             return None
 
     def execute_query(self, select_columns, conditions, order_by=None, limit=None):
+        start_time = time.time()
+        process = psutil.Process()
+        start_cpu_time = process.cpu_times()
+
         result = []
         for row_index, row in enumerate(self.data):
             if self.evaluate_conditions(row, conditions):
@@ -72,7 +78,19 @@ class QueryEngine:
         if limit:
             result = result[:int(limit)]
         
+        end_cpu_time = process.cpu_times()
+        end_time = time.time()
+
+        execution_time = end_time - start_time
+        cpu_usage = (end_cpu_time.user - start_cpu_time.user) + (end_cpu_time.system - start_cpu_time.system)
+        memory_usage = process.memory_info().rss / 1024 / 1024  # in MB
+
+        print(f"\nQuery Performance Metrics:")
+        print(f"Execution Time: {execution_time:.4f} seconds")
+        print(f"CPU Time: {cpu_usage:.4f} seconds")
+        print(f"Memory Usage: {memory_usage:.2f} MB")
         print(f"Query result count: {len(result)}")
+
         return result
 
     def safe_numeric_convert(self, value):

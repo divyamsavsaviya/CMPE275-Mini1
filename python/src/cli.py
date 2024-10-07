@@ -1,4 +1,5 @@
 import re
+import time
 
 class CLI:
     def __init__(self, query_engine):
@@ -17,6 +18,7 @@ class CLI:
                 break
 
             try:
+                start_time = time.time()
                 select_part, where_part, order_by, limit = self.parse_query(query)
 
                 select_columns = [col.strip() for col in select_part.replace('SELECT', '').strip().split(',')]
@@ -24,6 +26,8 @@ class CLI:
 
                 result = self.query_engine.execute_query(select_columns, conditions, order_by, limit)
                 self.display_results(result, select_columns)
+                end_time = time.time()
+                print(f"Total query processing time: {end_time - start_time:.4f} seconds")
             except Exception as e:
                 print(f"An error occurred: {str(e)}")
 
