@@ -150,18 +150,23 @@ class QueryEngine:
     def evaluate_single_condition(self, row, condition):
         column, operator, value = self.parse_condition(condition)
         actual_column = self.column_map.get(column.lower().strip('"'), column)
-        row_value = str(row.get(actual_column, '')).strip("'\"")
-        value = value.strip("'\"")
+        row_value = row.get(actual_column)
+        column_type = self.data.get_column_type(actual_column)
         
+        if row_value is None:
+            return False
+
+        try:
+            typed_value = column_type(value.strip("'\""))
+        except ValueError:
+            return False
+
         if operator == '=':
-            return row_value.strip().lower() == value.strip().lower()
-        elif operator in ['>', '<']:
-            try:
-                row_float = float(row_value) if row_value else 0
-                value_float = float(value)
-                return row_float > value_float if operator == '>' else row_float < value_float
-            except ValueError:
-                return False
+            return row_value == typed_value
+        elif operator == '>':
+            return row_value > typed_value
+        elif operator == '<':
+            return row_value < typed_value
         return False
 
     def parallel_select_columns(self, row_indices, select_columns):
