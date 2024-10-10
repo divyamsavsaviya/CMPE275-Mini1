@@ -3,6 +3,7 @@ import sys
 import argparse
 import time
 import psutil
+import traceback
 
 # Add the project root directory to the Python path
 project_root = os.path.dirname(os.path.abspath(__file__))
@@ -18,22 +19,30 @@ def main():
     print(f"Debug: Attempting to load file: {args.file_path}")  # Debug print
     start_time = time.time()
     data_loader = DataLoader(args.file_path)
-    data, columns = data_loader.load_data()
-    print(f"Debug: Loaded data length: {len(data)}")
-    print(f"Debug: Loaded columns: {columns}")
-    load_time = time.time() - start_time
-    print(f"Data loading time: {load_time:.2f} seconds")
+    
+    try:
+        data, columns = data_loader.load_data()
+        print(f"Debug: Loaded data length: {len(data)}")
+        print(f"Debug: Loaded columns: {columns}")
+        load_time = time.time() - start_time
+        print(f"Data loading time: {load_time:.2f} seconds")
 
-    if data is None or columns is None:
-        print("Error: Failed to load data")
-        return
+        if data is None or columns is None:
+            print("Error: Failed to load data")
+            return
 
-    print(f"Columns: {columns}")
-    print(f"Number of rows: {len(data)}")
+        print(f"Columns: {columns}")
+        print(f"Number of rows: {len(data)}")
 
-    query_engine = QueryEngine(data, columns)
-    cli = CLI(query_engine)
-    cli.run()
+        query_engine = QueryEngine(data, columns)
+        cli = CLI(query_engine)
+        cli.run()
+    except KeyboardInterrupt:
+        print("\nData loading interrupted by user. Exiting...")
+    except Exception as e:
+        print(f"An error occurred: {str(e)}")
+        print("Traceback:")
+        traceback.print_exc()
 
 if __name__ == '__main__':
     main()
