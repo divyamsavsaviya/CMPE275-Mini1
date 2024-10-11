@@ -7,6 +7,7 @@ from multiprocessing import Pool, cpu_count
 from collections import defaultdict
 import threading
 import functools
+import sys
 
 class QueryEngine:
     def __init__(self, data, columns, index_columns=None):
@@ -74,8 +75,11 @@ class QueryEngine:
         print(f"CPU Time: {cpu_usage:.4f} seconds")
         print(f"Memory Usage: {memory_usage:.2f} MB")
 
+        result_count = len(result)
+        result_size = sys.getsizeof(result)
+        
         self.query_cache.put(cache_key, result)
-        return result
+        return result, result_count, result_size
 
     def parallel_filter_data(self, conditions):
         if not conditions:

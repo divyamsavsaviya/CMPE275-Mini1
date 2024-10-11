@@ -11,6 +11,22 @@ sys.path.insert(0, project_root)
 
 from src import DataLoader, QueryEngine, CLI
 
+def display_results(results, result_count, result_size):
+    print(f"\nQuery Results:")
+    print(f"Total rows: {result_count}")
+    print(f"Result size: {result_size / 1024:.2f} KB")
+
+    if result_count > 100:
+        user_input = input("The result has more than 100 rows. Would you like to display the first 100 rows? (y/n): ")
+        if user_input.lower() == 'y':
+            for row in results[:100]:
+                print(row)
+        else:
+            print("Results not displayed due to large size.")
+    else:
+        for row in results:
+            print(row)
+
 def main():
     parser = argparse.ArgumentParser(description='CSV Query Engine')
     parser.add_argument('file_path', type=str, help='Path to the CSV file')
@@ -36,7 +52,20 @@ def main():
 
         query_engine = QueryEngine(data, columns)
         cli = CLI(query_engine)
-        cli.run()
+
+        while True:
+            query = input("Enter your SQL query (or 'exit' to quit): ")
+            if query.lower() == 'exit':
+                break
+
+            try:
+                results, result_count, result_size = query_engine.execute_query(query)
+                display_results(results, result_count, result_size)
+            except Exception as e:
+                print(f"An error occurred: {str(e)}")
+                print("Traceback:")
+                traceback.print_exc()
+
     except KeyboardInterrupt:
         print("\nData loading interrupted by user. Exiting...")
     except Exception as e:
