@@ -28,7 +28,7 @@ def main():
         print("Error: Failed to load data")
         return
 
-    print(f"Columns: {columns}")
+    # print(f"Columns: {columns}")
     print(f"Number of rows: {len(data)}")
 
     query_engine = QueryEngine(data, columns)

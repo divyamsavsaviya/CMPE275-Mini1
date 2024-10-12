@@ -257,11 +257,11 @@ class QueryEngine:
         return None, None, None
 
     def debug_print_data(self, limit=10):
-        print(f"Columns: {self.columns}")
-        print(f"First {limit} rows of data:")
-        for i in range(min(limit, len(self.data))):
-            row = self.data.get_row(i)
-            print(f"Row {i}: {row}")
+        # print(f"Columns: {self.columns}")
+        # print(f"First {limit} rows of data:")
+        # for i in range(min(limit, len(self.data))):
+        #     row = self.data.get_row(i)
+        #     print(f"Row {i}: {row}")
         print(f"Total number of rows: {len(self.data)}")
 
 class LRUCache:

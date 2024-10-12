@@ -14,10 +14,20 @@ class DataLoader:
             # Read the first row to infer data types
             first_row = next(reader)
             column_types = self.infer_column_types(first_row)
+
+            # print("Debug: Inferred column types:")
+            # for col, type_ in column_types.items():
+            #     print(f"  {col}: {type_.__name__}")
             
             # Add the first row
-            data.add_row({k.strip(): self.convert_value(v, column_types[k.strip()]) for k, v in first_row.items()})
-            
+            converted_row = {k.strip(): self.convert_value(v, column_types[k.strip()]) for k, v in first_row.items()}
+            data.add_row(converted_row)
+
+            # print("Debug: First row data types:")
+            # for col, value in converted_row.items():
+            #     print(f"  {col}: {type(value).__name__}")
+
+
             # Add the rest of the rows
             for row in reader:
                 cleaned_row = {k.strip(): self.convert_value(v, column_types[k.strip()]) for k, v in row.items()}
