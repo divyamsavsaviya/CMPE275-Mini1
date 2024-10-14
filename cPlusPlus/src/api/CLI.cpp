@@ -109,6 +109,7 @@ std::tuple<std::vector<std::string>, std::vector<std::pair<std::string, std::str
         std::istringstream iss(match[1]);
         std::string column;
         while (std::getline(iss, column, ',')) {
+            column.erase(std::remove(column.begin(), column.end(), '"'), column.end());
             selectColumns.push_back(this->trim(column));
         }
     }
@@ -147,6 +148,14 @@ std::tuple<std::vector<std::string>, std::vector<std::pair<std::string, std::str
     
     std::cout << "Order by: " << orderBy << std::endl;
     std::cout << "Limit: " << limit << std::endl;
+
+    // Remove quotes from column names
+    for (auto& column : selectColumns) {
+        column.erase(std::remove(column.begin(), column.end(), '"'), column.end());
+    }
+    for (auto& condition : conditions) {
+        condition.first.erase(std::remove(condition.first.begin(), condition.first.end(), '"'), condition.first.end());
+    }
 
     return {selectColumns, conditions, orderBy, limit};
 }

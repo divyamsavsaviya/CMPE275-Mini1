@@ -1,6 +1,6 @@
 CXX = mpic++
-CXXFLAGS = -std=c++17 -Wall -Wextra -g -mavx2 -IcPlusPlus/src/api -IcPlusPlus/src/data
-LDFLAGS = -lmpi
+CXXFLAGS = -std=c++17 -Wall -Wextra -O3 -march=native -fopenmp
+LDFLAGS = -fopenmp
 
 # Update these paths to match your OpenMPI installation 
 OPENMPI_INCLUDE = -I/usr/lib/x86_64-linux-gnu/openmpi/include
@@ -11,36 +11,57 @@ OPENMPI_LIB = -L/usr/lib/x86_64-linux-gnu/openmpi/lib
 # LIBS = -L$(OPENMPI_LIB)
 
 SRC_DIR = cPlusPlus/src
-API_DIR = $(SRC_DIR)/api
-DATA_DIR = $(SRC_DIR)/data
 BUILD_DIR = cPlusPlus/build
+BIN_DIR = cPlusPlus/bin
 
-INCLUDES = -I$(API_DIR) -I$(DATA_DIR)
+# Source files
+SRCS = $(wildcard $(SRC_DIR)/*.cpp) $(wildcard $(SRC_DIR)/*/*.cpp)
+OBJS = $(SRCS:$(SRC_DIR)/%.cpp=$(BUILD_DIR)/%.o)
 
-MAIN_SRC = $(SRC_DIR)/main.cpp
-SRCS = $(MAIN_SRC) $(wildcard $(SRC_DIR)/*.cpp) $(wildcard $(API_DIR)/*.cpp) $(wildcard $(DATA_DIR)/*.cpp)
-DEPS = $(OBJS:.o=.d)
+# Binary name
+TARGET = $(BIN_DIR)/query_engine
 
-OBJS = $(SRCS:%.cpp=$(BUILD_DIR)/%.o)
+# Default number of processes for MPI
+NP ?= 4
 
-EXEC = $(BUILD_DIR)/query_engine
+# Default input file
+INPUT_FILE ?= /mnt/c/Users/tript/IdeaProjects/CMPE275-Mini1/data/data_1.csv
 
-.PHONY: all clean run
+# Phony targets
+.PHONY: all clean run debug
 
-all: $(EXEC)
+# Default target
+all: $(TARGET)
 
-$(EXEC): $(OBJS)
+# Linking
+$(TARGET): $(OBJS) | $(BIN_DIR)
+	$(CXX) $(CXXFLAGS) $^ -o $@ $(LDFLAGS)
+
+# Compiling
+$(BUILD_DIR)/%.o: $(SRC_DIR)/%.cpp | $(BUILD_DIR)
 	@mkdir -p $(@D)
-	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS)
+	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-$(BUILD_DIR)/%.o: %.cpp
-	@mkdir -p $(@D)
-	$(CXX) $(CXXFLAGS) $(INCLUDES) -MMD -MP -c $< -o $@
+# Create directories
+$(BIN_DIR) $(BUILD_DIR):
+	mkdir -p $@
 
+# Clean build files
 clean:
-	rm -rf $(BUILD_DIR)
+	rm -rf $(BUILD_DIR) $(BIN_DIR)
 
-run: $(EXEC)
-	mpirun -np 0 ./$(EXEC) /mnt/c/Users/tript/IdeaProjects/CMPE275-Mini1/data/data_1.csv
+# Run the program
+run: $(TARGET)
+	mpirun -np $(NP) $(TARGET) $(INPUT_FILE)
 
--include $(DEPS)
+# Debug build
+debug: CXXFLAGS += -g -DDEBUG
+debug: clean $(TARGET)
+
+# Include dependencies
+-include $(OBJS:.o=.d)
+
+# Generate dependency files
+$(BUILD_DIR)/%.d: $(SRC_DIR)/%.cpp | $(BUILD_DIR)
+	@mkdir -p $(@D)
+	@$(CXX) $(CXXFLAGS) -MM -MT '$(@:.d=.o)' $< > $@
