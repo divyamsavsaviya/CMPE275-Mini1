@@ -1,5 +1,5 @@
 CXX = mpic++
-CXXFLAGS = -std=c++17 -Wall -Wextra -g
+CXXFLAGS = -std=c++17 -Wall -Wextra -g -mavx2 -IcPlusPlus/src/api -IcPlusPlus/src/data
 LDFLAGS = -lmpi
 
 # Update these paths to match your OpenMPI installation 
@@ -41,6 +41,6 @@ clean:
 	rm -rf $(BUILD_DIR)
 
 run: $(EXEC)
-	mpirun -np 8 ./$(EXEC) path/to/your/csv/file.csv
+	mpirun -np 0 ./$(EXEC) /mnt/c/Users/tript/IdeaProjects/CMPE275-Mini1/data/data_1.csv
 
 -include $(DEPS)

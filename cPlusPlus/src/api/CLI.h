@@ -1,6 +1,8 @@
 #pragma once
 #include "QueryEngine.h"
 #include "PerformanceMeasurement.h"
+#include "LockFreeQueue.h"
+#include <mpi.h> 
 #include <string>
 #include <vector>
 #include <utility>
@@ -14,6 +16,7 @@ public:
 
 private:
     QueryEngine& queryEngine;
+    LockFreeQueue<std::string> queryQueue;
     std::tuple<std::vector<std::string>, std::vector<std::pair<std::string, std::string>>, std::string, int> parseQuery(const std::string& query);
     void displayFormattedResults(const std::vector<std::unordered_map<std::string, std::string>>& results, const std::vector<std::string>& selectColumns);
     void displayPerformanceMetrics(const PerformanceMeasurement& perf, size_t resultCount, double totalTime);

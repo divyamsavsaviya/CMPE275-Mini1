@@ -2,13 +2,16 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
-#include "../data/CSVReaderFacade.h"
+#include "../data/MemoryMappedFile.h"
 
 class DataApi {
 public:
     DataApi(const std::string& filename);
     std::vector<std::unordered_map<std::string, std::string>> getAllData();
-    std::unordered_map<std::string, std::string> getByCountryCode(const std::string& countryCode);  // Remove the pointer
+    std::unordered_map<std::string, std::string> getByCountryCode(const std::string& countryCode);
+
 private:
-    CSVReaderFacade csvReader;
+    MemoryMappedFile mmFile;
+    void parseData();
+    std::vector<std::unordered_map<std::string, std::string>> parsedData;
 };

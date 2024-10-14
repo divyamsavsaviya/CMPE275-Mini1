@@ -4,38 +4,56 @@
 #include <regex>
 #include <chrono>
 #include <iomanip>
-#include "PerformanceMeasurement.h"
+#include <thread>
 
 CLI::CLI(QueryEngine& qe) : queryEngine(qe) {}
 
 void CLI::run() {
-    std::string query;
-    int rank;
+    int rank, size;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
 
     if (rank == 0) {
+        std::thread queryProcessor([this]() {
+            std::string query;
+            while (true) {
+                if (queryQueue.pop(query)) {
+                    if (query == "exit") break;
+
+                    std::cout << "Starting Performance Measurement" << std::endl;
+                    auto start_time = std::chrono::high_resolution_clock::now();
+
+                    auto [selectColumns, conditions, orderBy, limit] = parseQuery(query);
+                    auto [results, queryPerf] = queryEngine.executeQueryWithPerformance(selectColumns, conditions, orderBy, limit);
+
+                    auto end_time = std::chrono::high_resolution_clock::now();
+                    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time).count() / 1e6;
+
+                    std::cout << "Stopping Performance Measurement" << std::endl;
+
+                    displayFormattedResults(results, selectColumns);
+                    displayPerformanceMetrics(queryPerf, results.size(), duration);
+                }
+            }
+        });
+
+        std::string input;
         while (true) {
             std::cout << "\nEnter your query (or 'exit' to quit):\n";
             std::cout << "Format: SELECT column1,column2,... WHERE condition1 AND condition2 ... ORDER BY column [ASC|DESC] LIMIT n\n> ";
-            std::getline(std::cin, query);
+            std::getline(std::cin, input);
 
-            if (query == "exit") {
+            queryQueue.push(input);
+
+            if (input == "exit") {
                 break;
             }
-
-            auto start_time = std::chrono::high_resolution_clock::now();
-
-            auto [selectColumns, conditions, orderBy, limit] = parseQuery(query);
-            
-            auto [results, perf] = queryEngine.executeQueryWithPerformance(selectColumns, conditions, orderBy, limit);
-
-            auto end_time = std::chrono::high_resolution_clock::now();
-            auto total_duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time).count() / 1e6;
-
-            displayFormattedResults(results, selectColumns);
-            displayPerformanceMetrics(perf, results.size(), total_duration);
         }
+
+        queryProcessor.join();
     }
+
+    MPI_Barrier(MPI_COMM_WORLD);
 }
 
 void CLI::displayFormattedResults(const std::vector<std::unordered_map<std::string, std::string>>& results, const std::vector<std::string>& selectColumns) {
@@ -67,13 +85,11 @@ void CLI::displayFormattedResults(const std::vector<std::unordered_map<std::stri
 }
 
 void CLI::displayPerformanceMetrics(const PerformanceMeasurement& perf, size_t resultCount, double totalTime) {
-    std::cout << "\nQuery Performance Metrics:" << std::endl;
-    std::cout << "Execution Time: " << std::fixed << std::setprecision(4) << perf.getExecutionTime() << " seconds" << std::endl;
-    std::cout << "CPU Time: " << std::fixed << std::setprecision(4) << perf.getCPUTime() << " seconds" << std::endl;
-    std::cout << "Memory Usage: " << std::fixed << std::setprecision(2) << perf.getMemoryUsage() / (1024.0 * 1024.0) << " MB" << std::endl;
-    std::cout << "Query result count: " << resultCount << std::endl;
-    std::cout << "\nTotal results: " << resultCount << std::endl;
-    std::cout << "Total query processing time: " << std::fixed << std::setprecision(4) << totalTime << " seconds" << std::endl;
+    std::cout << "\nPerformance Metrics:" << std::endl;
+    std::cout << "Total results: " << resultCount << std::endl;
+    std::cout << "CPU Time: " << perf.getCPUTime() << " seconds" << std::endl;
+    std::cout << "Memory Used: " << perf.getMemoryUsage() << " bytes" << std::endl;
+    std::cout << "Total Execution Time: " << totalTime << " seconds" << std::endl;
 }
 
 std::tuple<std::vector<std::string>, std::vector<std::pair<std::string, std::string>>, std::string, int> CLI::parseQuery(const std::string& query) {

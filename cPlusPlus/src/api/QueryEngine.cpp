@@ -1,32 +1,15 @@
 #include "QueryEngine.h"
-#include "CSVReaderFacade.h"
 #include <algorithm>
-#include <stdexcept>
-#include <iostream> 
+#include <execution>
+#include <immintrin.h>
 
-QueryEngine::QueryEngine(const std::string& filename, int argc, char** argv) {
-    MPI_Init(&argc, &argv);
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    MPI_Comm_size(MPI_COMM_WORLD, &size);
-
-    if (rank == 0) {
-        CSVReaderFacade reader(filename);
-        data = reader.getAllData();
-        std::cout << "Loaded " << data.size() << " rows of data." << std::endl;
-    }
-
-    int dataSize = data.size();
-    MPI_Bcast(&dataSize, 1, MPI_INT, 0, MPI_COMM_WORLD);
-
-    if (rank != 0) {
-        data.resize(dataSize);
-    }
-
-    MPI_Bcast(data.data(), dataSize * sizeof(std::unordered_map<std::string, std::string>), MPI_BYTE, 0, MPI_COMM_WORLD);
+QueryEngine::QueryEngine(const std::string& filename, int, char**)
+    : dataApi(filename), threadPool(std::thread::hardware_concurrency()) {
+    // Initialize MPI or any other setup if needed
 }
 
 QueryEngine::~QueryEngine() {
-    MPI_Finalize();
+    // Add any necessary cleanup
 }
 
 std::pair<std::vector<std::unordered_map<std::string, std::string>>, PerformanceMeasurement> 
@@ -43,89 +26,134 @@ QueryEngine::executeQueryWithPerformance(const std::vector<std::string>& selectC
     return {results, perf};
 }
 
-std::vector<std::unordered_map<std::string, std::string>> QueryEngine::executeQueryParallel(
-    const std::vector<std::string>& selectColumns,
-    const std::vector<std::pair<std::string, std::string>>& conditions,
-    const std::string& orderBy,
-    int limit) {
+std::vector<std::unordered_map<std::string, std::string>> 
+QueryEngine::filterData(const std::vector<std::unordered_map<std::string, std::string>>& data,
+                        const std::vector<std::pair<std::string, std::string>>& conditions) {
+    std::vector<std::unordered_map<std::string, std::string>> result;
+    result.reserve(data.size());
 
-    int chunkSize = data.size() / size;
-    int startIdx = rank * chunkSize;
-    int endIdx = (rank == size - 1) ? data.size() : startIdx + chunkSize;
+    for (const auto& condition : conditions) {
+        const auto& column = condition.first;
+        const auto& value = condition.second;
 
-    std::vector<std::unordered_map<std::string, std::string>> localChunk(data.begin() + startIdx, data.begin() + endIdx);
-    std::vector<std::unordered_map<std::string, std::string>> localResults = processChunk(localChunk, selectColumns, conditions);
+        std::vector<float> numericValues;
+        numericValues.reserve(data.size());
 
-    std::vector<std::unordered_map<std::string, std::string>> globalResults;
-
-    if (rank == 0) {
-        globalResults = localResults;
-
-        for (int i = 1; i < size; ++i) {
-            int resultSize;
-            MPI_Recv(&resultSize, 1, MPI_INT, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-
-            std::vector<std::unordered_map<std::string, std::string>> receivedResults(resultSize);
-            MPI_Recv(receivedResults.data(), resultSize * sizeof(std::unordered_map<std::string, std::string>), MPI_BYTE, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-
-            globalResults.insert(globalResults.end(), receivedResults.begin(), receivedResults.end());
+        for (const auto& row : data) {
+            auto it = row.find(column);
+            if (it != row.end()) {
+                numericValues.push_back(std::stof(it->second));
+            }
         }
 
-        if (!orderBy.empty()) {
-            std::sort(globalResults.begin(), globalResults.end(),
-                [&orderBy](const auto& a, const auto& b) {
-                    auto it_a = a.find(orderBy);
-                    auto it_b = b.find(orderBy);
-                    if (it_a == a.end() || it_b == b.end()) {
-                        return false;
-                    }
-                    return it_a->second < it_b->second;
-                });
-        }
+        std::vector<int> matchResults(data.size());
+        float threshold = std::stof(value);
 
-        if (limit > 0 && limit < static_cast<int>(globalResults.size())) {
-            globalResults.resize(limit);
+        vectorized_filter(numericValues.data(), matchResults.data(), numericValues.size(), threshold);
+
+        for (size_t i = 0; i < data.size(); ++i) {
+            if (matchResults[i]) {
+                result.push_back(data[i]);
+            }
         }
-    } else {
-        int resultSize = localResults.size();
-        MPI_Send(&resultSize, 1, MPI_INT, 0, 0, MPI_COMM_WORLD);
-        MPI_Send(localResults.data(), resultSize * sizeof(std::unordered_map<std::string, std::string>), MPI_BYTE, 0, 0, MPI_COMM_WORLD);
     }
 
-    return globalResults;
+    return result;
+}
+
+void vectorized_filter(const float* data, int* result, int size, float threshold) {
+    __m256 thresh_vec = _mm256_set1_ps(threshold);
+    __m256i ones = _mm256_set1_epi32(1);
+    __m256i zeros = _mm256_setzero_si256();
+
+    for (int i = 0; i < size; i += 8) {
+        __m256 data_vec = _mm256_loadu_ps(data + i);
+        __m256 cmp_result = _mm256_cmp_ps(data_vec, thresh_vec, _CMP_GT_OQ);
+        __m256i int_result = _mm256_blendv_epi8(zeros, ones, _mm256_castps_si256(cmp_result));
+        _mm256_storeu_si256((__m256i*)(result + i), int_result);
+    }
+
+    // Handle any remaining elements
+    for (int i = (size / 8) * 8; i < size; ++i) {
+        result[i] = (data[i] > threshold) ? 1 : 0;
+    }
+}
+
+void QueryEngine::sortData(std::vector<std::unordered_map<std::string, std::string>>& data,
+                           const std::string& orderBy) {
+    std::sort(std::execution::par_unseq, data.begin(), data.end(),
+        [&orderBy](const auto& a, const auto& b) {
+            auto it_a = a.find(orderBy);
+            auto it_b = b.find(orderBy);
+            if (it_a != a.end() && it_b != b.end()) {
+                return it_a->second < it_b->second;
+            }
+            return false;
+        });
+}
+
+std::vector<std::unordered_map<std::string, std::string>>
+QueryEngine::projectData(const std::vector<std::unordered_map<std::string, std::string>>& data,
+                         const std::vector<std::string>& selectColumns) {
+    std::vector<std::unordered_map<std::string, std::string>> result;
+    result.reserve(data.size());
+
+    for (const auto& row : data) {
+        std::unordered_map<std::string, std::string> projectedRow;
+        for (const auto& col : selectColumns) {
+            auto it = row.find(col);
+            if (it != row.end()) {
+                projectedRow[col] = it->second;
+            }
+        }
+        result.push_back(std::move(projectedRow));
+    }
+
+    return result;
+}
+
+
+std::vector<std::unordered_map<std::string, std::string>> 
+QueryEngine::executeQueryParallel(const std::vector<std::string>& selectColumns,
+                                  const std::vector<std::pair<std::string, std::string>>& conditions,
+                                  const std::string& orderBy,
+                                  int limit) {
+    auto allData = dataApi.getAllData();
+    const size_t num_threads = std::thread::hardware_concurrency();
+    size_t chunkSize = allData.size() / num_threads;
+
+    std::vector<std::future<std::vector<std::unordered_map<std::string, std::string>>>> futures;
+
+    for (size_t i = 0; i < allData.size(); i += chunkSize) {
+        size_t end = std::min(i + chunkSize, allData.size());
+        std::vector<std::unordered_map<std::string, std::string>> chunk(allData.begin() + i, allData.begin() + end);
+
+        futures.push_back(threadPool.enqueue([this, chunk, &selectColumns, &conditions]() {
+            return processChunk(chunk, selectColumns, conditions);
+        }));
+    }
+
+    std::vector<std::unordered_map<std::string, std::string>> results;
+    for (auto& future : futures) {
+        auto chunkResult = future.get();
+        results.insert(results.end(), chunkResult.begin(), chunkResult.end());
+    }
+
+    if (!orderBy.empty()) {
+        sortData(results, orderBy);
+    }
+
+    if (limit > 0 && limit < static_cast<int>(results.size())) {
+        results.resize(limit);
+    }
+
+    return projectData(results, selectColumns);
 }
 
 std::vector<std::unordered_map<std::string, std::string>> 
 QueryEngine::processChunk(const std::vector<std::unordered_map<std::string, std::string>>& chunk,
                           const std::vector<std::string>& selectColumns,
                           const std::vector<std::pair<std::string, std::string>>& conditions) {
-    std::vector<std::unordered_map<std::string, std::string>> results;
-
-    for (const auto& row : chunk) {
-        bool satisfiesConditions = true;
-        for (const auto& [column, value] : conditions) {
-            std::string quotedColumn = '"' + column + '"';
-            auto it = row.find(quotedColumn);
-            if (it == row.end() || it->second != value) {
-                satisfiesConditions = false;
-                break;
-            }
-        }
-
-        if (satisfiesConditions) {
-            std::unordered_map<std::string, std::string> resultRow;
-            for (const auto& col : selectColumns) {
-                std::string quotedCol = '"' + col + '"';
-                auto it = row.find(quotedCol);
-                if (it != row.end()) {
-                    resultRow[col] = it->second;
-                }
-            }
-            if (!resultRow.empty()) {
-                results.push_back(resultRow);
-            }
-        }
-    }
-
-    return results;
+    auto filteredChunk = filterData(chunk, conditions);
+    return projectData(filteredChunk, selectColumns);
 }
