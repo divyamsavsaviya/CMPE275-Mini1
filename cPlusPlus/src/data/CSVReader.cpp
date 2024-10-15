@@ -3,6 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <limits>
+#include <cctype>
 
 CSVReader::CSVReader(const std::string& filename) : filename(filename) {}
 
@@ -22,59 +23,50 @@ std::vector<std::string> CSVReader::splitLine(const std::string& line) const {
     return result;
 }
 
-bool CSVReader::isInteger(const std::string& s) const {
-    std::istringstream iss(s);
-    int n;
-    iss >> std::noskipws >> n;
-    return iss.eof() && !iss.fail();
-}
-
-bool CSVReader::isFloat(const std::string& s) const {
-    std::istringstream iss(s);
-    float f;
-    iss >> std::noskipws >> f;
-    return iss.eof() && !iss.fail();
+bool CSVReader::isNumeric(const std::string& s) const {
+    return !s.empty() && std::find_if(s.begin(), s.end(), [](unsigned char c) { 
+        return !std::isdigit(c) && c != '.' && c != '-'; 
+    }) == s.end();
 }
 
 ColumnStore::ColumnData CSVReader::determineColumnType(const std::vector<std::string>& values) const {
-    bool allInteger = true;
-    bool allFloat = true;
+    bool allNumeric = true;
+    bool hasDecimal = false;
 
     for (const auto& value : values) {
-        if (value.empty()) continue;
-        if (!isInteger(value)) allInteger = false;
-        if (!isFloat(value)) allFloat = false;
-        if (!allInteger && !allFloat) break;
+        if (!value.empty() && !isNumeric(value)) {
+            allNumeric = false;
+            break;
+        }
+        if (value.find('.') != std::string::npos) {
+            hasDecimal = true;
+        }
     }
 
-    if (allInteger) {
-        std::vector<int> intValues;
-        for (const auto& value : values) {
-            if (value.empty()) {
-                intValues.push_back(0);
-            } else {
-                std::istringstream iss(value);
-                int n;
-                iss >> n;
-                intValues.push_back(n);
+    if (allNumeric) {
+        if (hasDecimal) {
+            std::vector<float> floatValues;
+            for (const auto& value : values) {
+                try {
+                    floatValues.push_back(value.empty() ? 0.0f : std::stof(value));
+                } catch (const std::exception&) {
+                    floatValues.push_back(0.0f);
+                }
             }
-        }
-        return intValues;
-    } else if (allFloat) {
-        std::vector<float> floatValues;
-        for (const auto& value : values) {
-            if (value.empty()) {
-                floatValues.push_back(0.0f);
-            } else {
-                std::istringstream iss(value);
-                float f;
-                iss >> f;
-                floatValues.push_back(f);
+            return floatValues;
+        } else {
+            std::vector<int> intValues;
+            for (const auto& value : values) {
+                try {
+                    intValues.push_back(value.empty() ? 0 : std::stoi(value));
+                } catch (const std::exception&) {
+                    intValues.push_back(0);
+                }
             }
+            return intValues;
         }
-        return floatValues;
     } else {
-        return values;
+        return values; // Keep as strings if not all values are numeric
     }
 }
 

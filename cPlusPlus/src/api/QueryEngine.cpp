@@ -28,6 +28,13 @@ std::vector<std::unordered_map<std::string, std::string>> QueryEngine::executeQu
     const std::vector<std::pair<std::string, std::string>>& conditions,
     const std::string& orderBy,
     int limit) {
+    // Check if all requested columns exist
+    for (const auto& col : selectColumns) {
+        if (dataStore.getColumns().find(col) == dataStore.getColumns().end()) {
+            throw std::runtime_error("Column not found: " + col);
+        }
+    }
+
     std::vector<std::unordered_map<std::string, std::string>> results;
     size_t rowCount = dataStore.getRowCount();
 
@@ -72,11 +79,39 @@ std::vector<std::unordered_map<std::string, std::string>> QueryEngine::executeQu
         }
     }
 
+    // Sorting
     if (!orderBy.empty()) {
-        std::sort(results.begin(), results.end(),
-            [&orderBy](const auto& a, const auto& b) {
+        if (dataStore.getColumns().find(orderBy) == dataStore.getColumns().end()) {
+            throw std::runtime_error("Order by column not found: " + orderBy);
+        }
+
+        std::sort(results.begin(), results.end(), [&](const auto& a, const auto& b) {
+            auto& columnData = dataStore.getColumns().at(orderBy);
+            if (std::holds_alternative<std::vector<int>>(columnData)) {
+                int aVal = 0, bVal = 0;
+                try {
+                    aVal = std::stoi(a.at(orderBy));
+                } catch (const std::exception&) {}
+                try {
+                    bVal = std::stoi(b.at(orderBy));
+                } catch (const std::exception&) {}
+                return aVal < bVal;
+            } else if (std::holds_alternative<std::vector<float>>(columnData)) {
+                float aVal = 0.0f, bVal = 0.0f;
+                try {
+                    aVal = std::stof(a.at(orderBy));
+                } catch (const std::exception&) {}
+                try {
+                    bVal = std::stof(b.at(orderBy));
+                } catch (const std::exception&) {}
+                return aVal < bVal;
+            } else {
                 return a.at(orderBy) < b.at(orderBy);
-            });
+            }
+        });
+        if (orderBy.find("DESC") != std::string::npos) {
+            std::reverse(results.begin(), results.end());
+        }
     }
 
     if (limit > 0 && static_cast<size_t>(limit) < results.size()) {
@@ -140,4 +175,12 @@ void QueryEngine::deserializeData(const std::vector<char>& buffer) {
         
         dataStore.addColumn(columnName, columnData);
     }
+}
+
+std::vector<std::string> QueryEngine::getColumnNames() const {
+    std::vector<std::string> columnNames;
+    for (const auto& [colName, colData] : dataStore.getColumns()) {
+        columnNames.push_back(colName);
+    }
+    return columnNames;
 }

@@ -40,23 +40,32 @@ void CLI::run() {
         PerformanceMeasurement queryPerf;
         queryPerf.start();
 
-        auto results = queryEngine.executeQuery(selectColumns, conditions, orderBy, limit);
+        try {
+            auto results = queryEngine.executeQuery(selectColumns, conditions, orderBy, limit);
 
-        queryPerf.stop();
+            queryPerf.stop();
 
-        std::cout << "Query results:" << std::endl;
-        for (const auto& row : results) {
-            for (const auto& [col, value] : row) {
-                std::cout << col << ": " << value << ", ";
+            std::cout << "Query results:" << std::endl;
+            for (const auto& row : results) {
+                for (const auto& [col, value] : row) {
+                    std::cout << col << ": " << value << ", ";
+                }
+                std::cout << std::endl;
             }
-            std::cout << std::endl;
-        }
 
-        std::cout << "\nPerformance Metrics:" << std::endl;
-        std::cout << "Total results: " << results.size() << std::endl;
-        std::cout << "CPU Time: " << queryPerf.getCPUTime() << " seconds" << std::endl;
-        std::cout << "Memory Used: " << queryPerf.getMemoryUsage() << " bytes" << std::endl;
-        std::cout << "Total Execution Time: " << queryPerf.getExecutionTime() << " seconds" << std::endl;
+            std::cout << "\nPerformance Metrics:" << std::endl;
+            std::cout << "Total results: " << results.size() << std::endl;
+            std::cout << "CPU Time: " << queryPerf.getCPUTime() << " seconds" << std::endl;
+            std::cout << "Memory Used: " << queryPerf.getMemoryUsage() << " bytes" << std::endl;
+            std::cout << "Total Execution Time: " << queryPerf.getExecutionTime() << " seconds" << std::endl;
+        } catch (const std::exception& e) {
+            std::cerr << "Error executing query: " << e.what() << std::endl;
+            // Print available columns
+            std::cout << "Available columns:" << std::endl;
+            for (const auto& colName : queryEngine.getColumnNames()) {
+                std::cout << colName << std::endl;
+            }
+        }
     }
 }
 

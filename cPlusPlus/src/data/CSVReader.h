@@ -10,8 +10,7 @@ private:
     std::string removeQuotes(const std::string& str) const;
     std::vector<std::string> splitLine(const std::string& line) const;
     ColumnStore::ColumnData determineColumnType(const std::vector<std::string>& values) const;
-    bool isInteger(const std::string& s) const;
-    bool isFloat(const std::string& s) const;
+    bool isNumeric(const std::string& s) const;
 
 public:
     CSVReader(const std::string& filename);

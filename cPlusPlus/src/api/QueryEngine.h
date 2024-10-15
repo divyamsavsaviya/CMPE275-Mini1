@@ -26,6 +26,8 @@ public:
     QueryEngine(const std::string& filename);
     ~QueryEngine() = default;
 
+    bool columnExists(const std::string& columnName) const;
+
     std::vector<std::unordered_map<std::string, std::string>> executeQuery(
         const std::vector<std::string>& selectColumns,
         const std::vector<std::pair<std::string, std::string>>& conditions,
@@ -34,4 +36,6 @@ public:
 
     void serializeData(std::vector<char>& buffer) const;
     void deserializeData(const std::vector<char>& buffer);
+
+    std::vector<std::string> getColumnNames() const;
 };
