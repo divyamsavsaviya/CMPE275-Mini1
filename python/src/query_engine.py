@@ -2,6 +2,7 @@ import re
 import time
 import psutil
 from functools import lru_cache
+from functools import partial
 from concurrent.futures import ThreadPoolExecutor
 from multiprocessing import Pool, cpu_count
 from collections import defaultdict
@@ -48,7 +49,7 @@ class QueryEngine:
         process = psutil.Process()
         start_cpu_time = process.cpu_times()
 
-        filtered_data = self.parallel_filter_data(conditions)
+        filtered_data = self.filter_data(conditions)
         print(f"Debug: Filtered data length: {len(filtered_data)}")
 
         selected_data = self.parallel_select_columns(filtered_data, mapped_select_columns)
@@ -77,97 +78,69 @@ class QueryEngine:
         self.query_cache.put(cache_key, result)
         return result
 
-    def parallel_filter_data(self, conditions):
+    def filter_data(self, conditions):
         if not conditions:
-            return range(len(self.data))
+            return list(range(len(self.data)))
 
-        # Check if we can use an index for any of the conditions
-        indexed_condition = self.find_indexed_condition(conditions)
-        if indexed_condition:
-            return self.filter_with_index(indexed_condition, conditions)
+        with ThreadPoolExecutor(max_workers=self.thread_count) as executor:
+            chunk_size = len(self.data) // self.thread_count
+            chunks = [range(i, min(i + chunk_size, len(self.data))) for i in range(0, len(self.data), chunk_size)]
+            partial_filter = partial(self._filter_chunk, conditions=conditions)
+            results = list(executor.map(partial_filter, chunks))
 
-        # If no index can be used, proceed with parallel filtering
-        chunk_size = max(1, len(self.data) // (cpu_count() * 4))
-        chunks = [range(i, min(i+chunk_size, len(self.data))) for i in range(0, len(self.data), chunk_size)]
-        chunk_count = len(chunks)
-    
-        print(f"Debug: Filtering data using {chunk_count} chunks")
+        return [idx for chunk in results for idx in chunk]
 
-        futures = []
-        for chunk in chunks:
-            futures.append(self.thread_pool.submit(self.filter_chunk, chunk, conditions))
+    def _filter_chunk(self, chunk, conditions):
+        return [i for i in chunk if self._meets_conditions(i, conditions)]
 
-        results = []
-        for future in futures:
-            results.extend(future.result())
+    def _meets_conditions(self, row_index, conditions):
+        return all(self._evaluate_condition(row_index, condition) for condition in conditions)
 
-        return results
-
-    def find_indexed_condition(self, conditions):
-        for condition in conditions:
-            column, operator, value = self.parse_condition(condition)
-            if column in self.indexes and operator == '=':
-                return column, value
-        return None
-
-    def filter_with_index(self, indexed_condition, all_conditions):
-        column, value = indexed_condition
-        initial_set = set(self.indexes[column].get(value, []))
-        
-        if len(all_conditions) == 1:
-            return list(initial_set)
-        
-        # Apply remaining conditions
-        result = []
-        for i in initial_set:
-            row = self.data.get_row(i)
-            if self.evaluate_conditions(row, all_conditions):
-                result.append(i)
-        return result
-
-    def filter_chunk(self, chunk, conditions):
-        result = []
-        for i in chunk:
-            row = self.data.get_row(i)
-            if self.evaluate_conditions(row, conditions):
-                result.append(i)
-        print(f"Debug: Filter chunk result length: {len(result)}")
-        return result
-
-    def evaluate_conditions(self, row, conditions):
-        if not conditions:
-            return True
-        
-        or_conditions = [cond.strip() for cond in ' '.join(conditions).split('OR')]
-        
-        for or_condition in or_conditions:
-            and_conditions = [cond.strip() for cond in or_condition.split('AND')]
-            if all(self.evaluate_single_condition(row, cond) for cond in and_conditions):
-                return True
-        
-        return False
-
-    def evaluate_single_condition(self, row, condition):
+    def _evaluate_condition(self, row_index, condition):
         column, operator, value = self.parse_condition(condition)
-        actual_column = self.column_map.get(column.lower().strip('"'), column)
-        row_value = row.get(actual_column)
-        column_type = self.data.get_column_type(actual_column)
+        column_value = self.data.get_column(column)[row_index]
         
-        if row_value is None:
-            return False
-
-        try:
-            typed_value = column_type(value.strip("'\""))
-        except ValueError:
-            return False
+        # Convert year columns to integers for comparison
+        if column.isdigit():
+            column_value = int(column_value) if column_value else 0
+            value = int(value)
+        elif self._is_numeric(column_value):
+            column_value = float(column_value)
+            value = float(value)
 
         if operator == '=':
-            return row_value == typed_value
+            return column_value == value
         elif operator == '>':
-            return row_value > typed_value
+            return column_value > value
         elif operator == '<':
-            return row_value < typed_value
-        return False
+            return column_value < value
+        elif operator == '>=':
+            return column_value >= value
+        elif operator == '<=':
+            return column_value <= value
+        elif operator == '!=':
+            return column_value != value
+        else:
+            raise ValueError(f"Unsupported operator: {operator}")
+
+    @staticmethod
+    def _is_numeric(value):
+        try:
+            float(value)
+            return True
+        except (ValueError, TypeError):
+            return False
+
+    @staticmethod
+    def parse_condition(condition):
+        pattern = r'(?:"([^"]+)"|(\w+))\s*([=<>!]+)\s*(?:\'([^\']*)\'|"([^"]*)"|([\w.]+))'
+        match = re.match(pattern, condition)
+        if match:
+            column = match.group(1) or match.group(2)
+            operator = match.group(3)
+            value = match.group(4) or match.group(5) or match.group(6)
+            return column.strip('"'), operator, value
+        raise ValueError(f"Invalid condition format: {condition}")
 
     def parallel_select_columns(self, row_indices, select_columns):
         chunk_size = max(1, len(row_indices) // (cpu_count() * 4))
