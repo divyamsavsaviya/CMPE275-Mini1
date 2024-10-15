@@ -5,55 +5,59 @@
 #include <chrono>
 #include <iomanip>
 #include <thread>
+#include "PerformanceMeasurement.h"
+#include <mpi.h>
 
 CLI::CLI(QueryEngine& qe) : queryEngine(qe) {}
 
 void CLI::run() {
-    int rank, size;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    MPI_Comm_size(MPI_COMM_WORLD, &size);
+    std::string input;
+    while (true) {
+        std::cout << "\nEnter your query (or 'exit' to quit):" << std::endl;
+        std::cout << "Format: SELECT column1,column2,... WHERE condition1 AND condition2 ... ORDER BY column [ASC|DESC] LIMIT n" << std::endl;
+        std::cout << "> ";
+        std::getline(std::cin, input);
 
-    if (rank == 0) {
-        std::thread queryProcessor([this]() {
-            std::string query;
-            while (true) {
-                if (queryQueue.pop(query)) {
-                    if (query == "exit") break;
-
-                    std::cout << "Starting Performance Measurement" << std::endl;
-                    auto start_time = std::chrono::high_resolution_clock::now();
-
-                    auto [selectColumns, conditions, orderBy, limit] = parseQuery(query);
-                    auto [results, queryPerf] = queryEngine.executeQueryWithPerformance(selectColumns, conditions, orderBy, limit);
-
-                    auto end_time = std::chrono::high_resolution_clock::now();
-                    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time).count() / 1e6;
-
-                    std::cout << "Stopping Performance Measurement" << std::endl;
-
-                    displayFormattedResults(results, selectColumns);
-                    displayPerformanceMetrics(queryPerf, results.size(), duration);
-                }
-            }
-        });
-
-        std::string input;
-        while (true) {
-            std::cout << "\nEnter your query (or 'exit' to quit):\n";
-            std::cout << "Format: SELECT column1,column2,... WHERE condition1 AND condition2 ... ORDER BY column [ASC|DESC] LIMIT n\n> ";
-            std::getline(std::cin, input);
-
-            queryQueue.push(input);
-
-            if (input == "exit") {
-                break;
-            }
+        if (input == "exit") {
+            // Broadcast exit signal to all processes
+            int exit_signal = 1;
+            MPI_Bcast(&exit_signal, 1, MPI_INT, 0, MPI_COMM_WORLD);
+            break;
         }
 
-        queryProcessor.join();
-    }
+        auto [selectColumns, conditions, orderBy, limit] = parseQuery(input);
 
-    MPI_Barrier(MPI_COMM_WORLD);
+        std::cout << "Parsed query:" << std::endl;
+        std::cout << "Select columns: ";
+        for (const auto& col : selectColumns) std::cout << col << ", ";
+        std::cout << std::endl;
+        std::cout << "Conditions: ";
+        for (const auto& cond : conditions) std::cout << cond.first << "=" << cond.second << ", ";
+        std::cout << std::endl;
+        std::cout << "Order by: " << orderBy << std::endl;
+        std::cout << "Limit: " << limit << std::endl;
+
+        PerformanceMeasurement queryPerf;
+        queryPerf.start();
+
+        auto results = queryEngine.executeQuery(selectColumns, conditions, orderBy, limit);
+
+        queryPerf.stop();
+
+        std::cout << "Query results:" << std::endl;
+        for (const auto& row : results) {
+            for (const auto& [col, value] : row) {
+                std::cout << col << ": " << value << ", ";
+            }
+            std::cout << std::endl;
+        }
+
+        std::cout << "\nPerformance Metrics:" << std::endl;
+        std::cout << "Total results: " << results.size() << std::endl;
+        std::cout << "CPU Time: " << queryPerf.getCPUTime() << " seconds" << std::endl;
+        std::cout << "Memory Used: " << queryPerf.getMemoryUsage() << " bytes" << std::endl;
+        std::cout << "Total Execution Time: " << queryPerf.getExecutionTime() << " seconds" << std::endl;
+    }
 }
 
 void CLI::displayFormattedResults(const std::vector<std::unordered_map<std::string, std::string>>& results, const std::vector<std::string>& selectColumns) {

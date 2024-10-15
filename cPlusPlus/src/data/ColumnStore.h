@@ -3,44 +3,58 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
-#include <algorithm> 
-#include <cctype>   
+#include <variant>
+#include <algorithm>
+#include <stdexcept>
 
 class ColumnStore {
-private:
-    std::unordered_map<std::string, std::vector<std::string>> columns;
-    size_t rowCount;
-
 public:
-    void addColumn(const std::string& columnName, std::vector<std::string>&& data) {
-        columns[columnName] = std::move(data);
-        rowCount = columns[columnName].size();
-    }
+    using ColumnData = std::variant<std::vector<std::string>, std::vector<int>, std::vector<float>>;
 
-    std::vector<std::string>& getColumn(const std::string& columnName) {
-        return columns.at(columnName);
-    }
+private:
+    std::unordered_map<std::string, ColumnData> columns;
 
-    const std::vector<std::string>& getColumn(const std::string& columnName) const {
-        auto it = std::find_if(columns.begin(), columns.end(),
-            [&columnName](const auto& pair) {
-                return std::equal(columnName.begin(), columnName.end(),
-                                  pair.first.begin(), pair.first.end(),
-                                  [](char a, char b) {
-                                      return std::tolower(static_cast<unsigned char>(a)) == std::tolower(static_cast<unsigned char>(b));
-                                  });
-            });
+    template<typename T>
+    const std::vector<T>& getTypedColumn(const std::string& columnName) const {
+        auto it = columns.find(columnName);
         if (it == columns.end()) {
             throw std::out_of_range("Column not found: " + columnName);
         }
-        return it->second;
+        return std::get<std::vector<T>>(it->second);
+    }
+
+public:
+    void addColumn(const std::string& columnName, const ColumnData& data) {
+        columns[columnName] = data;
+    }
+
+    const std::vector<std::string>& getStringColumn(const std::string& columnName) const {
+        return getTypedColumn<std::string>(columnName);
+    }
+
+    const std::vector<int>& getIntColumn(const std::string& columnName) const {
+        return getTypedColumn<int>(columnName);
+    }
+
+    const std::vector<float>& getFloatColumn(const std::string& columnName) const {
+        return getTypedColumn<float>(columnName);
+    }
+
+    bool isNumericColumn(const std::string& columnName) const {
+        auto it = columns.find(columnName);
+        if (it == columns.end()) {
+            return false;
+        }
+        return std::holds_alternative<std::vector<int>>(it->second) || 
+               std::holds_alternative<std::vector<float>>(it->second);
     }
 
     size_t getRowCount() const {
         if (columns.empty()) return 0;
-        return columns.begin()->second.size();
+        return std::visit([](const auto& vec) { return vec.size(); }, columns.begin()->second);
     }
 
-    size_t getColumnCount() const { return columns.size(); }
-    const std::unordered_map<std::string, std::vector<std::string>>& getColumns() const { return columns; }
+    const std::unordered_map<std::string, ColumnData>& getColumns() const {
+        return columns;
+    }
 };

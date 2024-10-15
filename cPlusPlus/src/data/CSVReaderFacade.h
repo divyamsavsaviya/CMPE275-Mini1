@@ -2,14 +2,17 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
+#include "CSVReader.h"
+#include "ColumnStore.h"
 
 class CSVReaderFacade {
-public:
-    CSVReaderFacade(const std::string& filename);
-    std::vector<std::unordered_map<std::string, std::string>> getAllData();
-    std::unordered_map<std::string, std::string> getByCountryCode(const std::string& countryCode);  // Change return type to non-pointer
 private:
-    std::string filename;
-    std::vector<std::unordered_map<std::string, std::string>> data;
-    std::unordered_map<std::string, std::unordered_map<std::string, std::string>*> indexedData;
+    CSVReader reader;
+    ColumnStore columnStore;
+
+public:
+    CSVReaderFacade(const std::string& filename) : reader(filename) {}
+
+    ColumnStore getAllData();
+    std::unordered_map<std::string, std::string> getByCountryCode(const std::string& countryCode);
 };

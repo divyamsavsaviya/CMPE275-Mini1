@@ -2,14 +2,18 @@
 #include <vector>
 #include <string>
 #include <unordered_map>
+#include "ColumnStore.h"
 
 class CSVReader {
 private:
     std::string filename;
     std::string removeQuotes(const std::string& str) const;
     std::vector<std::string> splitLine(const std::string& line) const;
+    ColumnStore::ColumnData determineColumnType(const std::vector<std::string>& values) const;
+    bool isInteger(const std::string& s) const;
+    bool isFloat(const std::string& s) const;
 
 public:
     CSVReader(const std::string& filename);
-    std::vector<std::unordered_map<std::string, std::string>> readCSV();
+    ColumnStore readCSV();
 };

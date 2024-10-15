@@ -7,7 +7,6 @@
 #include <string>
 #include <cstring>
 
-// Helper function to broadcast a vector of strings
 void broadcastVector(const std::vector<std::string>& vec, int root) {
     int size = vec.size();
     MPI_Bcast(&size, 1, MPI_INT, root, MPI_COMM_WORLD);
@@ -22,7 +21,6 @@ void broadcastVector(const std::vector<std::string>& vec, int root) {
     }
 }
 
-// Helper function to receive a broadcasted vector of strings
 std::vector<std::string> receiveBroadcastVector(int root) {
     std::vector<std::string> vec;
     int size;
@@ -40,7 +38,7 @@ std::vector<std::string> receiveBroadcastVector(int root) {
     return vec;
 }
 
-int main(int argc, char** argv) {
+int main(int argc, char* argv[]) {
     MPI_Init(&argc, &argv);
 
     int rank, size;
@@ -55,40 +53,18 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    QueryEngine* queryEngine = nullptr;
-    if (rank == 0) {
-        queryEngine = new QueryEngine(argv[1]);
-        // Broadcast the data to other processes
-        std::vector<char> buffer;
-        queryEngine->serializeData(buffer);
-        
-        int bufferSize = buffer.size();
-        MPI_Bcast(&bufferSize, 1, MPI_INT, 0, MPI_COMM_WORLD);
-        MPI_Bcast(buffer.data(), bufferSize, MPI_CHAR, 0, MPI_COMM_WORLD);
-    } else {
-        queryEngine = new QueryEngine(); // Create an empty QueryEngine
-        // Receive the broadcast data and populate the QueryEngine
-        int bufferSize;
-        MPI_Bcast(&bufferSize, 1, MPI_INT, 0, MPI_COMM_WORLD);
-        std::vector<char> buffer(bufferSize);
-        MPI_Bcast(buffer.data(), bufferSize, MPI_CHAR, 0, MPI_COMM_WORLD);
-        queryEngine->deserializeData(buffer);
-    }
-
-    CLI cli(*queryEngine);
+    std::string filename = argv[1];
+    QueryEngine queryEngine(filename);
 
     if (rank == 0) {
+        // Only the root process handles user input
+        CLI cli(queryEngine);
         cli.run();
     } else {
-        // Worker processes wait for queries
-        while (true) {
-            // Receive query from master process
-            // Execute query
-            // Send results back to master process
-        }
+        // Other processes wait for work (implement this later)
+        // For now, they'll just wait
     }
 
-    delete queryEngine;
     MPI_Finalize();
     return 0;
 }
